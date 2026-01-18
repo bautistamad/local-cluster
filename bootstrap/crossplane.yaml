@@ -6,9 +6,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://charts.crossplane.io
+    repoURL: https://charts.crossplane.io/stable
     chart: crossplane
-    targetRevision: 1.15.0
+    targetRevision: 1.18.1
     helm:
       values: |
         args:
