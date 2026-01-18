@@ -16,7 +16,7 @@ spec:
   endpoint:
     url:
       type: Static
-      static: http://host.docker.internal:4566
+      static: http://host.docker.internal:4510
     hostnameImmutable: true
   skip_credentials_validation: true
   skip_metadata_api_check: true

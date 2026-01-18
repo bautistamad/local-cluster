@@ -3,3 +3,9 @@ kind: Kustomization
 
 resources:
 - provider-aws.yaml
+- provider-aws-ec2.yaml
+- provider-aws-rds.yaml
+- provider-aws-lambda.yaml
+- provider-aws-dynamodb.yaml
+- provider-aws-sqs.yaml
+- provider-aws-sns.yaml
