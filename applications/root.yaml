@@ -9,9 +9,11 @@ spec:
     repoURL: https://github.com/bautistamad/local-cluster
     targetRevision: main
     path: .
+    kustomize:
+      # Only process kustomization.yaml files
+      version: v5.0
   destination:
     server: https://kubernetes.default.svc
-    namespace: default
   syncPolicy:
     automated:
       prune: true

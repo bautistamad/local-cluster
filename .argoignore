@@ -1,0 +1,9 @@
+# Kind cluster configuration - not a Kubernetes manifest
+cluster.yaml
+
+# Documentation
+README.md
+CLAUDE.md
+
+# ArgoCD directory - managed separately
+argocd/
