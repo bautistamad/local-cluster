@@ -4,65 +4,156 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Kubernetes IN Docker (kind) project for managing local Kubernetes clusters. Currently contains a basic cluster configuration with one control-plane node and two worker nodes.
+GitOps repository for managing a local Kubernetes cluster using Kind, ArgoCD, and Crossplane with LocalStack.
 
-## Kind Cluster Configuration
+**Stack:**
+- **Kind**: Local Kubernetes cluster (3 nodes: 1 control-plane, 2 workers)
+- **ArgoCD**: GitOps continuous deployment
+- **Crossplane**: Infrastructure as Code with LocalStack provider
+- **LocalStack**: Local AWS cloud emulation
 
-**File:** `cluster.yaml`
-- Defines a 3-node Kind cluster (1 control-plane, 2 workers)
-- Uses Kind API version `kind.x-k8s.io/v1alpha4`
+## Repository Structure
 
-**Common Commands:**
+```
+local-cluster/
+├── cluster/                    # Local Kind configuration (not synced to cluster)
+│   └── kind-config.yaml        # Kind cluster topology definition
+│
+├── bootstrap/                  # ArgoCD Applications (apply manually)
+│   ├── main.yaml              # Infrastructure Application
+│   └── crossplane.yaml        # Crossplane Helm Application
+│
+├── infrastructure/             # Core cluster infrastructure (managed by ArgoCD)
+│   ├── namespaces/            # Namespace definitions
+│   ├── crossplane/            # Crossplane providers & configs
+│   │   ├── providers/         # Crossplane providers (AWS, etc)
+│   │   └── providerconfigs/   # Provider configurations (LocalStack)
+│   └── kustomization.yaml
+│
+└── apps/                       # User applications (managed by ArgoCD)
+    └── kustomization.yaml
+```
+
+## Common Commands
+
+### Cluster Management
+
 ```bash
-# Create the cluster
-kind create cluster --config cluster.yaml --name kind
+# Create the Kind cluster
+kind create cluster --config cluster/kind-config.yaml --name kind
 
 # Delete the cluster
 kind delete cluster --name kind
 
 # Get cluster info
-kind get clusters
 kubectl cluster-info --context kind-kind
-
-# Access cluster
-kubectl config use-context kind-kind
-
-# Check nodes
 kubectl get nodes
 ```
 
-## Expected Project Structure
+### ArgoCD Management
 
-As this project grows, consider this structure:
+```bash
+# Apply bootstrap Applications (do this ONCE after ArgoCD installation)
+kubectl apply -f bootstrap/main.yaml
+kubectl apply -f bootstrap/crossplane.yaml
 
+# Check ArgoCD Applications
+kubectl get applications -n argocd
+argocd app list
+argocd app get infrastructure
+argocd app get crossplane
+
+# Access ArgoCD UI
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+# Username: admin
+# Password: kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
 ```
-kind/
-├── cluster.yaml          # Cluster node configuration
-├── manifests/            # Kubernetes manifests (deployments, services, etc)
-│   ├── namespaces/
-│   ├── core/
-│   └── apps/
-├── helm/                 # Helm charts (if using Helm)
-├── scripts/              # Automation scripts
-│   ├── setup.sh          # Initial cluster setup
-│   ├── deploy.sh         # Application deployment
-│   └── cleanup.sh
-└── docs/                 # Documentation
-    └── ARCHITECTURE.md
+
+### Crossplane & LocalStack
+
+```bash
+# Check Crossplane installation
+kubectl get providers
+kubectl get providerconfigs
+
+# Check LocalStack health
+curl http://localhost:4566/_localstack/health
+
+# Create a test S3 bucket with Crossplane
+kubectl apply -f - <<EOF
+apiVersion: s3.aws.upbound.io/v1beta1
+kind: Bucket
+metadata:
+  name: test-bucket
+spec:
+  forProvider:
+    region: us-east-1
+  providerConfigRef:
+    name: localstack
+EOF
+
+# Check managed resources
+kubectl get managed
+kubectl get buckets
 ```
 
-## Development Workflow
+## GitOps Workflow
 
-When expanding this project:
+1. **Make changes** to manifests in `infrastructure/` or `apps/`
+2. **Commit and push** to main branch
+3. **ArgoCD syncs automatically** (automated sync enabled)
+4. **Verify deployment**: `argocd app get <app-name>`
 
-1. **Add manifests** to `manifests/` for Kubernetes resources
-2. **Create setup scripts** in `scripts/` if automating cluster initialization
-3. **Use `kubectl apply -f`** to deploy manifests
-4. **Document architecture** if adding complex deployments or GitOps patterns
+### Adding New Infrastructure
 
-## Notes for Future Work
+1. Create manifests in `infrastructure/<component>/`
+2. Update `infrastructure/kustomization.yaml` to include new component
+3. Commit and push - ArgoCD applies automatically
 
-- If using Helm, add `helm/` directory with chart structures
-- If adding GitOps (ArgoCD, Flux), document the workflow in `docs/`
-- If adding application code (controllers, operators), create separate directories with appropriate build/test tooling
-- Keep `cluster.yaml` as the source of truth for cluster topology
+### Adding New Applications
+
+1. Create manifests in `apps/<app-name>/`
+2. Update `apps/kustomization.yaml` to include new app
+3. Commit and push - ArgoCD applies automatically
+
+## Architecture Notes
+
+**Separation of Concerns:**
+- `cluster/` - Local configuration (ignored by ArgoCD)
+- `bootstrap/` - ArgoCD Application definitions (applied manually once)
+- `infrastructure/` - Core cluster services (namespaces, Crossplane, etc)
+- `apps/` - User applications
+
+**ArgoCD Applications:**
+- `infrastructure` - Monitors `infrastructure/` directory via Kustomize
+- `crossplane` - Installs Crossplane via Helm chart directly
+
+**Crossplane with LocalStack:**
+- Provider: `provider-aws-s3` (Upbound)
+- ProviderConfig: `localstack` (points to `http://host.docker.internal:4566`)
+- Credentials: Fake credentials in Secret `aws-creds`
+
+## Initial Setup (from scratch)
+
+```bash
+# 1. Create Kind cluster
+kind create cluster --config cluster/kind-config.yaml --name kind
+
+# 2. Install ArgoCD
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+# 3. Wait for ArgoCD to be ready
+kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
+
+# 4. Bootstrap GitOps
+kubectl apply -f bootstrap/main.yaml
+kubectl apply -f bootstrap/crossplane.yaml
+
+# 5. Start LocalStack (in separate terminal)
+docker run -d -p 4566:4566 localstack/localstack
+
+# 6. Verify everything is synced
+argocd app list
+kubectl get providers
+```

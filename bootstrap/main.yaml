@@ -1,14 +1,14 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: main
+  name: infrastructure
   namespace: argocd
 spec:
   project: default
   source:
     repoURL: https://github.com/bautistamad/local-cluster
     targetRevision: main
-    path: .
+    path: infrastructure
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:

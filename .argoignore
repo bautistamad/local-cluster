@@ -1,9 +1,9 @@
-# Kind cluster configuration - not a Kubernetes manifest
-cluster.yaml
+# Local cluster configuration (not K8s manifests)
+cluster/
 
 # Documentation
 README.md
 CLAUDE.md
 
-# ArgoCD directory - managed separately
-argocd/
+# Bootstrap Applications (applied manually to ArgoCD)
+bootstrap/
